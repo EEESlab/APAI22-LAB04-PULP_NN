@@ -1,0 +1,7 @@
+#Parallelized Matrix multiplication
+
+To execute on a single core:
+$ make clean all run CORES=1
+
+To execute on N cores (1 to 8):
+$ make clean all run CORES=N
