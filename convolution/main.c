@@ -79,7 +79,7 @@ void cluster_entry() {
   };
 
   // configure perf counters
-  pi_perf_conf(1<<PI_PERF_CYCLES | 1<<PI_PERF_INSTR);          
+  pi_perf_conf(1<<PI_PERF_CYCLES);
   pi_perf_reset();                      
   pi_perf_stop();                       
   pi_perf_start(); 
@@ -91,16 +91,9 @@ void cluster_entry() {
   pi_perf_stop();          
   int cid = pi_core_id();   
   int perf_cyc =  pi_perf_read(PI_PERF_CYCLES);
-  // TODO: Does it make sense to count this on a single core?
-  int perf_inst =  pi_perf_read(PI_PERF_INSTR);
-  int MACs = DIM_KERNEL_X * DIM_KERNEL_Y * CH_IM_IN * DIM_IM_OUT_X * DIM_IM_OUT_Y * CH_IM_OUT;
-  float perf_MAC =  (float)MACs/perf_cyc;
 
   printf("Convolution layer completed, running on %d cores\n", NUM_CORES);
   printf(" - num_cycles: %d\n", perf_cyc); 
-  printf(" - num_instr: %d\n", perf_inst); 
-  printf(" - MACs: %d\n", MACs); 
-  printf(" - MAC/cycle: %f\n\n", perf_MAC); 
 
   int errors = 0;
   for (int i = 0; i < (DIM_IM_OUT_X * DIM_IM_OUT_Y * CH_IM_OUT); i++)

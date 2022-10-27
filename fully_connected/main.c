@@ -52,11 +52,9 @@ void cluster_fn(void *args) {
 
     int perf_cyc =  pi_perf_read(PI_PERF_CYCLES);
     int perf_ins =  pi_perf_read(PI_PERF_INSTR);
-    int MACs = CH_IM_IN * CH_IM_OUT;
-    float perf_MAC =  (float)MACs/perf_cyc;
 
-    printf("[CORE %d] FullyConnected layer performance: #cycles: %d, #inst: %d, MACs: %d, MAC/cycle: %f\n\n",
-          core_id, perf_cyc, perf_ins, MACs, perf_MAC);
+    printf("[CORE %d] FullyConnected layer performance: #cycles: %d, #inst: %d\n\n",
+          core_id, perf_cyc, perf_ins);
   #ifndef PER_CORE_PERF
   }
   #endif
