@@ -1,7 +1,8 @@
 /*
- * test.c
+ * main.c
+ *
+ * Luka Macan <luka.macan@unibo.it>
  * Nazareno Bruschi <nazareno.bruschi@unibo.it>
- * Manuele Rusci <manuele.rusci@unibo.it>
  *
  * Copyright (C) 2019-2021 University of Bologna
  *
@@ -19,78 +20,57 @@
  */
 
 #include "pmsis.h"
-#include "pulp_nn_utils.h"
+#include "fully_connected.h"
 
 // data allocation and golden models
 #include "golden.h"
 #include "data_allocation.h"
 
-typedef struct {
-  uint8_t *input;
-  int8_t  *weights;
-  int32_t *output;
-  int      channels_in;
-  int      channels_out;
-} fc_args_t;
 
-int32_t dotp_u8_i8_i32(uint8_t *a, int8_t *b, size_t length) {
-  int32_t sum = 0;
-  for (int i = 0; i < length; i++) 
-    sum += a[i] * b[i];
-  return sum;
-}
-
-int32_t dotp_u8_i8_i32_simd(uint8_t *a, int8_t *b, size_t length) {
-  v4u *vA = (v4u *)a;
-  v4s *vB = (v4s *)b;
-
-  int32_t sum = 0;
-  for (int i = 0; i < length / 4; i++) 
-    sum = SumDotp4(vA[i], vB[i], sum);
-
-  // Remainder
-  size_t begin = (length / 4) * 4; // length & -4
-  size_t end = begin + (length % 4);
-  for (int i = begin; i < end; i++)
-    sum += a[i] * b[i];
-
-  return sum;
-}
-
-int calculate_per_core_size(int size) {
-  const int log2core = log2(NUM_CORES);
-  return size >> log2core + ((size & ((1 << log2core)-1)) != 0); 
-}
-
-void fully_connected(void *args) {
-  const fc_args_t fc_args = *(fc_args_t *)args;
-
+void cluster_fn(void *args) {
   const int core_id = pi_core_id();
-  const int log2core = log2(NUM_CORES);
 
-  // parallelize over output feature dimension
-  const int size = calculate_per_core_size(fc_args.channels_out); 
-  const int begin = min(size * core_id, fc_args.channels_out);
-  const int end = min(begin + size, fc_args.channels_out);
-
-  for (int i = begin; i < end; i++) {
-    int8_t *weights_row = fc_args.weights + (i * fc_args.channels_in);
-    #if USE_SIMD == 0
-    fc_args.output[i] = dotp_u8_i8_i32(fc_args.input, weights_row, fc_args.channels_in);
-    #else
-    fc_args.output[i] = dotp_u8_i8_i32_simd(fc_args.input, weights_row, fc_args.channels_in);
-    #endif
+  #ifndef PER_CORE_PERF
+  if (core_id == 0) {
+  #endif
+    // Setup and start performance counters
+    pi_perf_conf(1<<PI_PERF_CYCLES | 1<<PI_PERF_INSTR);          
+    pi_perf_reset();                      
+    pi_perf_stop();                       
+    pi_perf_start();
+  #ifndef PER_CORE_PERF
   }
+  #endif
+
+  fully_connected(*(fc_args_t *)args);
+
+  #ifndef PER_CORE_PERF
+  if (core_id == 0) {
+  #endif
+    // Stop performance counters and print out the performance
+    pi_perf_stop();          
+
+    int perf_cyc =  pi_perf_read(PI_PERF_CYCLES);
+    int perf_ins =  pi_perf_read(PI_PERF_INSTR);
+    int MACs = CH_IM_IN * CH_IM_OUT;
+    float perf_MAC =  (float)MACs/perf_cyc;
+
+    printf("[CORE %d] FullyConnected layer performance: #cycles: %d, #inst: %d, MACs: %d, MAC/cycle: %f\n\n",
+          core_id, perf_cyc, perf_ins, MACs, perf_MAC);
+  #ifndef PER_CORE_PERF
+  }
+  #endif
 }
 
 void cluster_entry() {
-  // copy inputs and weights from L2 to L1
+  // Copy inputs and weights from L2 to L1
   for(int i=0; i<(CH_IM_IN); i++)
     IN_INT8_L1[i] = IN_INT8_L2[i];
 
   for(int i=0; i<(CH_IM_IN * CH_IM_OUT); i++)
     WEIGHT_INT8_L1[i] = WEIGHT_INT8_L2[i];
 
+  // Arguments for the `cluster_fn` function
   fc_args_t fc_args = {
     .input = IN_INT8_L1,
     .weights = WEIGHT_INT8_L1,
@@ -101,30 +81,10 @@ void cluster_entry() {
 
   printf("\n\nRunning the FullyConnected layer\n");
 
-  // setup and start performance counters
-  pi_perf_conf(1<<PI_PERF_CYCLES | 1<<PI_PERF_INSTR);          
-  pi_perf_reset();                      
-  pi_perf_stop();                       
-  pi_perf_start(); 
+  // Execute function `cluster_fn` over NUM_CORES cores
+  pi_cl_team_fork(NUM_CORES, (void *)cluster_fn, (void *)&fc_args);
 
-  // call the fully connected
-  pi_cl_team_fork(NUM_CORES, (void *)fully_connected, (void *)&fc_args);
-
-  // compute print performance
-  pi_perf_stop();          
-
-  int perf_cyc =  pi_perf_read(PI_PERF_CYCLES);
-  int perf_ins =  pi_perf_read(PI_PERF_INSTR);
-  int MACs = CH_IM_IN * CH_IM_OUT;
-  float perf_MAC =  (float)MACs/perf_cyc;
-
-  printf("FullyConnected layer completed!\nRuntime statistics on %d cores:\n", NUM_CORES);
-  printf("  - num_cycles: %d\n", perf_cyc); 
-  printf("  - num_inst: %d\n", perf_ins);
-  printf("  - MACs: %d\n", MACs); 
-  printf("  - MAC/cycle: %f\n\n", perf_MAC); 
-
-  //check results
+  // Check results
   int errors = 0;
   for (int i = 0; i < CH_IM_OUT; i++)
     if(OUT_L1[i] != OUT_L2[i]) {
