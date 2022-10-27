@@ -83,8 +83,7 @@ void fully_connected(void *args) {
   }
 }
 
-void cluster_entry()
-{
+void cluster_entry() {
   // copy inputs and weights from L2 to L1
   for(int i=0; i<(CH_IM_IN); i++)
     IN_INT8_L1[i] = IN_INT8_L2[i];
@@ -100,7 +99,7 @@ void cluster_entry()
     .channels_out = CH_IM_OUT
   };
 
-  printf("\n\nRunning the FullyConnected layer (%dx%d)!\n", fc_args.channels_in, fc_args.channels_out);
+  printf("\n\nRunning the FullyConnected layer\n");
 
   // setup and start performance counters
   pi_perf_conf(1<<PI_PERF_CYCLES | 1<<PI_PERF_INSTR);          
@@ -119,17 +118,17 @@ void cluster_entry()
   int MACs = CH_IM_IN * CH_IM_OUT;
   float perf_MAC =  (float)MACs/perf_cyc;
 
-  printf("Fully-connected layer completed!\nRuntime statistics on %d cores:\n", NUM_CORES);
+  printf("FullyConnected layer completed!\nRuntime statistics on %d cores:\n", NUM_CORES);
   printf("  - num_cycles: %d\n", perf_cyc); 
   printf("  - num_inst: %d\n", perf_ins);
   printf("  - MACs: %d\n", MACs); 
-  printf("  - MAC/cycle: %f\n", perf_MAC); 
+  printf("  - MAC/cycle: %f\n\n", perf_MAC); 
 
   //check results
   int errors = 0;
   for (int i = 0; i < CH_IM_OUT; i++)
     if(OUT_L1[i] != OUT_L2[i]) {
-      printf("Erraneous result found at index %d: calculated %d vs. golden %d\n", i, OUT_L1[i], OUT_L2[i]);
+      printf("Error at index %d: got %d instead of %d", i, OUT_L1[i], OUT_L2[i]);
       errors++;
     }
 
@@ -143,8 +142,7 @@ void cluster_entry()
 ////------------------------MAIN------------------------------/////
 ///////////////////////////////////////////////////////////////////
 
-int main()
-{
+int main() {
   struct pi_device cl_dev;
   struct pi_cluster_conf cl_conf;
 
