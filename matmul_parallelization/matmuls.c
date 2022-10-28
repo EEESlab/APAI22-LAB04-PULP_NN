@@ -24,7 +24,7 @@ void gemm(int * MatA, int * MatB, int* MatC, int NN, int MM, int KK){
     pi_cl_team_barrier();
 
 }
-/* TASK 1.4: Loop unrolling technique
+/* TASK 1.3: Loop unrolling technique
  *
  * Does the scheduling of the instructions avoid the stalls?
  * If you have the following pattern:
@@ -43,7 +43,7 @@ void gemm(int * MatA, int * MatB, int* MatC, int NN, int MM, int KK){
  * loops might be always unrolled and, in fact, the compiler tends
  * to apply the unrolling whenever he can.
  * 
- * 1.4.1: Implement loop unrolling with factor of 2, 4, 8, 16 and
+ * 1.3.2: Implement loop unrolling with factor of 2, 4, 8, 16 and
  * fill the table with the overall MACs/cycle for 8 cores execution.
  * Do you see a regression doing more aggressive loop unrolling? Why?
  * The problem is that implenting unrolling, you are forcing multiple
@@ -58,7 +58,7 @@ void gemm(int * MatA, int * MatB, int* MatC, int NN, int MM, int KK){
  * the register for another operand. This effect would distroy all the
  * performance metrics.
  * 
- * BONUS 1.4.2: Is there a smarter way to compute it? If you look deeper
+ * BONUS 1.4: Is there a smarter way to compute it? If you look deeper
  * into the kernel implemetation you should see that the index of matrix A
  * depends on i and k, which are the outermost and the innermost loop indexes
  * respectively, while the one of matrix B depends on the j and k. This means
@@ -90,7 +90,7 @@ void gemm_unroll(int * MatA, int * MatB, int* MatC, int NN, int MM, int KK){
   // for (int i = i_start; i < i_end; i ++) {
   //   for (int j = 0; j < MM; j++) {
   //     int acc = 0;
-  //     for (int k = 0; k < KK; PUT YOUR CODE HERE) {
+  //     for (int k = 0; k < KK; /*YOUR CORE HERE*/) {
   //       // memory insns
   //       int A0  = MatA[i*KK+(k+0)];
   //       int A1  = MatA[i*KK+(k+1)];

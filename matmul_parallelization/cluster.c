@@ -38,8 +38,7 @@ PI_L1 int B[K*M];
 PI_L1 int C[N*M];
 
 void gemm(int * MatA, int * MatB, int* MatC, int NN, int MM, int KK);
-
-void gemm_unroll_1x4(int * MatA, int * MatB, int* MatC, int NN, int MM, int KK);
+void gemm_unroll(int * MatA, int * MatB, int* MatC, int NN, int MM, int KK);
 
 void fill_matrix(int * Mat, int height, int width, int val){
     for (int i=0; i<height*width; i++)
@@ -135,12 +134,17 @@ void cluster_fn() {
    *                       p
    *            (1 - p) + ---
    *                       N
+   * where
+   *  - p is the part of the code that ca be parallelized
+   *  - 1-p is the part of the code that can not be parallelized
+   *  - N is the number of cores
+   *  - S is the speedup
    * 
-   * You can speed up only the parallel code!!
+   * Take away message: You can speed up only the parallel code!!
    * 
    */
   // task to profile
-  gemm(A, B, C, N, M, K);
+  gemm(A, B, C, N, M, K); 
   //gemm_unroll(A, B, C, N, M, K);
   //gemm_reuse(A, B, C, N, M, K);
 
@@ -152,14 +156,18 @@ void cluster_fn() {
 
     cycles_cnt = pi_perf_read(PI_PERF_CYCLES);
     //instr_cnt = pi_perf_read(PI_PERF_INSTR);
-    // PUT YOUR CODE HERE (read the ld stalls counter)
+	  // float ipc = (float) instr_cnt / (float) cycles_cnt;
+    // /*YOUR CODE HERE*/ // (read the ld stalls counter)
 
-    printf("[%d]: Clock Cycles: %d | %d cores execution\n",
+    printf("coreID [%d]: Clock Cycles: %d | %d cores execution\n",
         pi_core_id(), cycles_cnt, NUM_CORES);
-    // printf("[%d]: Number of Instructions: %d\nClock Cycles: %d | %d cores execution\n",
-    //     pi_core_id(), instr_cnt, cycles_cnt, NUM_CORES);
-    // PUT YOUR CODE HERE (print the ld stalls counter)
+    printf("coreID [%d]: Number of Instructions: %-6d\tClock Cycles: %d\tIPC= %.2f | %d cores execution\n",
+        pi_core_id(), instr_cnt, cycles_cnt, ipc, NUM_CORES);
+    // (print the ld stalls counter)
+    // printf("coreID [%d]: Stalls: %d, instructions %d, cycles %d, IPC %.2f| %d cores execution\n",
+    //     pi_core_id(), /*YOUR CODE HERE*/, instr_cnt, cycles_cnt, ipc, NUM_CORES);    
   }
+
 
   pi_cl_team_barrier();
 
